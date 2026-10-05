@@ -13,17 +13,19 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { useFinancial } from '../../context/FinancialContext';
+import { useAuth } from '../../context/AuthContext';
 import { BankLogo } from '../common/BankLogo';
 
 export const SettingsScreen: React.FC = () => {
-  const { accounts, resetToDemoData, setCurrentScreen, disconnectAccount } = useFinancial();
+  const { accounts, setCurrentScreen, disconnectAccount } = useFinancial();
+  const { user, activeWorkspace } = useAuth();
 
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'notifications' | 'accounts' | 'preferences'>('profile');
 
   // Preferences
-  const [userName, setUserName] = useState('Ada Okafor');
-  const [userEmail, setUserEmail] = useState('ada.okafor@cashdeck.ng');
-  const [userPhone, setUserPhone] = useState('+234 801 234 5678');
+  const [userName, setUserName] = useState(user?.name || 'Account Owner');
+  const [userEmail, setUserEmail] = useState(user?.email || '');
+  const [userPhone, setUserPhone] = useState(user?.phone || '+234 800 000 0000');
   const [currency, setCurrency] = useState('₦ (Nigerian Naira)');
   const [biometricLogin, setBiometricLogin] = useState(true);
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -341,23 +343,29 @@ export const SettingsScreen: React.FC = () => {
       {/* Preferences Tab */}
       {activeTab === 'preferences' && (
         <div className="bg-white rounded-3xl p-6 border border-slate-200/70 shadow-xs space-y-4 text-xs">
-          <h3 className="text-sm font-bold text-slate-900">System Reset & Diagnostics</h3>
-          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-            <h4 className="font-bold text-slate-900">Reset Application to Reference Demo Data</h4>
-            <p className="text-slate-500 text-[11px] leading-relaxed">
-              Clears local session storage and re-populates Nigerian financial data matching the reference dashboard images.
-            </p>
-            <button
-              onClick={() => {
-                resetToDemoData();
-                setSavedSuccess(true);
-                setTimeout(() => setSavedSuccess(false), 3000);
-              }}
-              className="mt-2 flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold transition-colors"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reset to Sample Data</span>
-            </button>
+          <h3 className="text-sm font-bold text-slate-900">Regional & Display Preferences</h3>
+          <div className="space-y-4">
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Base Currency</label>
+              <select
+                value={currency}
+                onChange={e => setCurrency(e.target.value)}
+                className="w-full max-w-sm px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 font-medium"
+              >
+                <option>₦ (Nigerian Naira - NGN)</option>
+                <option>$ (US Dollar - USD)</option>
+                <option>£ (British Pound - GBP)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Timezone</label>
+              <input
+                type="text"
+                disabled
+                value="Africa/Lagos (GMT+1)"
+                className="w-full max-w-sm px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-100 font-medium text-slate-500"
+              />
+            </div>
           </div>
         </div>
       )}

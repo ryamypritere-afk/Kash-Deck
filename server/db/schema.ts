@@ -9,6 +9,9 @@ export const users = pgTable('users', {
   passwordHash: text('password_hash').notNull(),
   emailVerifiedAt: text('email_verified_at'),
   phoneVerifiedAt: text('phone_verified_at'),
+  activeWorkspaceId: text('active_workspace_id'),
+  consentVersion: text('consent_version'),
+  consentAt: text('consent_at'),
   status: text('status').notNull().default('active'),
   twoFactorSecret: text('two_factor_secret'),
   twoFactorEnabled: integer('two_factor_enabled').notNull().default(0),
@@ -18,7 +21,20 @@ export const users = pgTable('users', {
   updatedAt: text('updated_at').notNull()
 });
 
-// 2. Sessions Table
+// 2. User Profiles Table
+export const userProfiles = pgTable('user_profiles', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id),
+  occupation: text('occupation'),
+  financialFocus: text('financial_focus'), // JSON array string
+  incomeRegularity: text('income_regularity'),
+  expectedMonthlyIncomeMinor: integer('expected_monthly_income_minor'),
+  expectedMonthlyExpensesMinor: integer('expected_monthly_expenses_minor'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull()
+});
+
+// 3. Sessions Table
 export const sessions = pgTable('sessions', {
   id: text('id').primaryKey(),
   userId: text('user_id').notNull().references(() => users.id),
@@ -31,7 +47,7 @@ export const sessions = pgTable('sessions', {
   createdAt: text('created_at').notNull()
 });
 
-// 3. Workspaces Table
+// 4. Workspaces Table
 export const workspaces = pgTable('workspaces', {
   id: text('id').primaryKey(),
   type: text('type').notNull(), // 'personal' | 'business'
@@ -40,13 +56,15 @@ export const workspaces = pgTable('workspaces', {
   timezone: text('timezone').notNull().default('Africa/Lagos'),
   ownerId: text('owner_id').notNull().references(() => users.id),
   planId: text('plan_id').notNull().default('free'),
+  onboardingStatus: text('onboarding_status').notNull().default('not_started'), // 'not_started' | 'in_progress' | 'completed'
+  onboardingStep: text('onboarding_step').notNull().default('welcome'),
   isDemo: integer('is_demo').notNull().default(0),
   settingsJson: text('settings_json').notNull().default('{}'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull()
 });
 
-// 4. Workspace Members Table
+// 5. Workspace Members Table
 export const workspaceMembers = pgTable('workspace_members', {
   id: text('id').primaryKey(),
   workspaceId: text('workspace_id').notNull().references(() => workspaces.id),
@@ -55,12 +73,17 @@ export const workspaceMembers = pgTable('workspace_members', {
   createdAt: text('created_at').notNull()
 });
 
-// 5. Business Profiles Table
+// 6. Business Profiles Table
 export const businessProfiles = pgTable('business_profiles', {
   id: text('id').primaryKey(),
   workspaceId: text('workspace_id').notNull().references(() => workspaces.id),
   legalName: text('legal_name').notNull(),
   businessType: text('business_type').notNull().default('Retail'),
+  currentTrackingMethod: text('current_tracking_method'),
+  salesEntryMode: text('sales_entry_mode').notNull().default('daily'), // 'daily' | 'transaction'
+  featureProfile: text('feature_profile').notNull().default('{"inventory":true,"customers":true,"suppliers":true}'),
+  expectedMonthlySalesMinor: integer('expected_monthly_sales_minor'),
+  expectedMonthlyExpensesMinor: integer('expected_monthly_expenses_minor'),
   rcNumber: text('rc_number'),
   tin: text('tin'),
   address: text('address'),
@@ -69,11 +92,21 @@ export const businessProfiles = pgTable('business_profiles', {
   updatedAt: text('updated_at').notNull()
 });
 
-// 6. Financial Accounts Table
+// 7. Onboarding Answers Table (Persisted across devices & resumes)
+export const onboardingAnswers = pgTable('onboarding_answers', {
+  id: text('id').primaryKey(),
+  workspaceId: text('workspace_id').notNull().references(() => workspaces.id),
+  stepKey: text('step_key').notNull(),
+  payloadJson: text('payload_json').notNull().default('{}'),
+  completedAt: text('completed_at').notNull(),
+  skipped: integer('skipped').notNull().default(0)
+});
+
+// 8. Financial Accounts Table
 export const accounts = pgTable('accounts', {
   id: text('id').primaryKey(),
   workspaceId: text('workspace_id').notNull().references(() => workspaces.id),
-  type: text('type').notNull(), // 'bank' | 'cash' | 'wallet' | 'card' | 'loan' | 'credit'
+  type: text('type').notNull(), // 'bank' | 'cash' | 'wallet' | 'card' | 'loan' | 'credit' | 'savings' | 'investment'
   institution: text('institution').notNull(),
   name: text('name').notNull(),
   maskedNumber: text('masked_number'),
@@ -89,7 +122,7 @@ export const accounts = pgTable('accounts', {
   updatedAt: text('updated_at').notNull()
 });
 
-// 7. Categories Table
+// 9. Categories Table
 export const categories = pgTable('categories', {
   id: text('id').primaryKey(),
   workspaceId: text('workspace_id'), // null = system default
@@ -102,7 +135,7 @@ export const categories = pgTable('categories', {
   createdAt: text('created_at').notNull()
 });
 
-// 8. Transactions Table
+// 10. Transactions Table
 export const transactions = pgTable('transactions', {
   id: text('id').primaryKey(),
   workspaceId: text('workspace_id').notNull().references(() => workspaces.id),
@@ -117,7 +150,7 @@ export const transactions = pgTable('transactions', {
   classification: text('classification').notNull().default('Personal'),
   notes: text('notes'),
   status: text('status').notNull().default('posted'), // 'posted' | 'pending' | 'needs_review' | 'reversed'
-  source: text('source').notNull().default('manual'), // 'manual' | 'import' | 'bank' | 'sale' | 'purchase'
+  source: text('source').notNull().default('manual'), // 'manual' | 'import' | 'bank' | 'sale' | 'purchase' | 'opening_balance'
   externalId: text('external_id'),
   dedupeHash: text('dedupe_hash'),
   transferGroupId: text('transfer_group_id'),
@@ -127,7 +160,41 @@ export const transactions = pgTable('transactions', {
   deletedAt: text('deleted_at')
 });
 
-// 9. Audit Logs Table (Append-only)
+// 11. Daily Sales Entries Table (for Business Daily Sales Mode)
+export const dailySalesEntries = pgTable('daily_sales_entries', {
+  id: text('id').primaryKey(),
+  workspaceId: text('workspace_id').notNull().references(() => workspaces.id),
+  date: text('date').notNull(), // 'YYYY-MM-DD'
+  totalSalesMinor: integer('total_sales_minor').notNull(),
+  cashMinor: integer('cash_minor').notNull().default(0),
+  transferMinor: integer('transfer_minor').notNull().default(0),
+  posMinor: integer('pos_minor').notNull().default(0),
+  otherMinor: integer('other_minor').notNull().default(0),
+  transactionCount: integer('transaction_count'),
+  notes: text('notes'),
+  createdBy: text('created_by').references(() => users.id),
+  historyJson: text('history_json').notNull().default('[]'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull()
+});
+
+// 12. Goals Table
+export const goals = pgTable('goals', {
+  id: text('id').primaryKey(),
+  workspaceId: text('workspace_id').notNull().references(() => workspaces.id),
+  name: text('name').notNull(),
+  category: text('category').notNull(),
+  targetAmountMinor: integer('target_amount_minor').notNull(),
+  currentAmountMinor: integer('current_amount_minor').notNull().default(0),
+  targetDate: text('target_date').notNull(),
+  iconName: text('icon_name').notNull().default('Target'),
+  color: text('color').notNull().default('#047857'),
+  status: text('status').notNull().default('active'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull()
+});
+
+// 13. Audit Logs Table (Append-only)
 export const auditLogs = pgTable('audit_logs', {
   id: text('id').primaryKey(),
   workspaceId: text('workspace_id'),

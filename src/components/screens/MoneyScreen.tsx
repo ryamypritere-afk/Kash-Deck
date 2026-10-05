@@ -68,8 +68,8 @@ export const MoneyScreen: React.FC = () => {
   const [cashCategory, setCashCategory] = useState('Groceries');
   const [cashClassification, setCashClassification] = useState<'Personal' | 'Business'>('Personal');
 
-  // Dev simulation banner open/close
-  const [showDevToolbar, setShowDevToolbar] = useState(true);
+  // Dev simulation banner (hidden in production paths)
+  const [showDevToolbar, setShowDevToolbar] = useState(false);
 
   // Connected personal accounts (excluding business only accounts)
   const connectedAccounts = useMemo(() => {

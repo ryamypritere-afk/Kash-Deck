@@ -26,11 +26,26 @@ export async function initializeDatabase() {
       password_hash TEXT NOT NULL,
       email_verified_at TEXT,
       phone_verified_at TEXT,
+      active_workspace_id TEXT,
+      consent_version TEXT,
+      consent_at TEXT,
       status TEXT NOT NULL DEFAULT 'active',
       two_factor_secret TEXT,
       two_factor_enabled INTEGER NOT NULL DEFAULT 0,
       two_factor_recovery_codes TEXT,
       last_login_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS user_profiles (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      occupation TEXT,
+      financial_focus TEXT,
+      income_regularity TEXT,
+      expected_monthly_income_minor INTEGER,
+      expected_monthly_expenses_minor INTEGER,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -55,6 +70,8 @@ export async function initializeDatabase() {
       timezone TEXT NOT NULL DEFAULT 'Africa/Lagos',
       owner_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       plan_id TEXT NOT NULL DEFAULT 'free',
+      onboarding_status TEXT NOT NULL DEFAULT 'not_started',
+      onboarding_step TEXT NOT NULL DEFAULT 'welcome',
       is_demo INTEGER NOT NULL DEFAULT 0,
       settings_json TEXT NOT NULL DEFAULT '{}',
       created_at TEXT NOT NULL,
@@ -74,12 +91,26 @@ export async function initializeDatabase() {
       workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
       legal_name TEXT NOT NULL,
       business_type TEXT NOT NULL DEFAULT 'Retail',
+      current_tracking_method TEXT,
+      sales_entry_mode TEXT NOT NULL DEFAULT 'daily',
+      feature_profile TEXT NOT NULL DEFAULT '{"inventory":true,"customers":true,"suppliers":true}',
+      expected_monthly_sales_minor INTEGER,
+      expected_monthly_expenses_minor INTEGER,
       rc_number TEXT,
       tin TEXT,
       address TEXT,
       is_vat_registered INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS onboarding_answers (
+      id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+      step_key TEXT NOT NULL,
+      payload_json TEXT NOT NULL DEFAULT '{}',
+      completed_at TEXT NOT NULL,
+      skipped INTEGER NOT NULL DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS accounts (
@@ -137,6 +168,38 @@ export async function initializeDatabase() {
       deleted_at TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS daily_sales_entries (
+      id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+      date TEXT NOT NULL,
+      total_sales_minor INTEGER NOT NULL,
+      cash_minor INTEGER NOT NULL DEFAULT 0,
+      transfer_minor INTEGER NOT NULL DEFAULT 0,
+      pos_minor INTEGER NOT NULL DEFAULT 0,
+      other_minor INTEGER NOT NULL DEFAULT 0,
+      transaction_count INTEGER,
+      notes TEXT,
+      created_by TEXT REFERENCES users(id),
+      history_json TEXT NOT NULL DEFAULT '[]',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS goals (
+      id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      category TEXT NOT NULL,
+      target_amount_minor INTEGER NOT NULL,
+      current_amount_minor INTEGER NOT NULL DEFAULT 0,
+      target_date TEXT NOT NULL,
+      icon_name TEXT NOT NULL DEFAULT 'Target',
+      color TEXT NOT NULL DEFAULT '#047857',
+      status TEXT NOT NULL DEFAULT 'active',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS audit_logs (
       id TEXT PRIMARY KEY,
       workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
@@ -158,7 +221,29 @@ export async function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS idx_transactions_workspace ON transactions(workspace_id, occurred_at);
     CREATE INDEX IF NOT EXISTS idx_transactions_account ON transactions(account_id);
     CREATE INDEX IF NOT EXISTS idx_audit_logs_workspace ON audit_logs(workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_daily_sales_workspace_date ON daily_sales_entries(workspace_id, date);
+    CREATE INDEX IF NOT EXISTS idx_goals_workspace ON goals(workspace_id);
   `);
+
+  // Safe migrations for newly added columns if table already existed
+  try {
+    await pglite.exec(`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS active_workspace_id TEXT;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_version TEXT;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_at TEXT;
+
+      ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS onboarding_status TEXT NOT NULL DEFAULT 'not_started';
+      ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS onboarding_step TEXT NOT NULL DEFAULT 'welcome';
+
+      ALTER TABLE business_profiles ADD COLUMN IF NOT EXISTS current_tracking_method TEXT;
+      ALTER TABLE business_profiles ADD COLUMN IF NOT EXISTS sales_entry_mode TEXT NOT NULL DEFAULT 'daily';
+      ALTER TABLE business_profiles ADD COLUMN IF NOT EXISTS feature_profile TEXT NOT NULL DEFAULT '{"inventory":true,"customers":true,"suppliers":true}';
+      ALTER TABLE business_profiles ADD COLUMN IF NOT EXISTS expected_monthly_sales_minor INTEGER;
+      ALTER TABLE business_profiles ADD COLUMN IF NOT EXISTS expected_monthly_expenses_minor INTEGER;
+    `);
+  } catch (migErr) {
+    console.warn('[CashDeck DB] Safe column migration notice:', migErr);
+  }
 
   console.log('[CashDeck DB] PostgreSQL schema initialized successfully.');
 }

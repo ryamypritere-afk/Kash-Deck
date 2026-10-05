@@ -1,20 +1,30 @@
 import express from 'express';
+import cookieParser from 'cookie-parser';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { apiRouter } from './server/routes';
+import { apiV1Router } from './server/routesV1';
+import { initializeDatabase } from './server/db/client';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 async function bootstrap() {
+  // Initialize embedded PostgreSQL schema & migrations
+  await initializeDatabase();
+
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
 
-  // JSON request body parser
+  // JSON request body parser & cookie parser
   app.use(express.json());
+  app.use(cookieParser());
 
-  // Mount API router
+  // Mount API v1 router
+  app.use('/api/v1', apiV1Router);
+
+  // Mount legacy API router for backwards compatibility where needed
   app.use('/api', apiRouter);
 
   // Healthcheck endpoint

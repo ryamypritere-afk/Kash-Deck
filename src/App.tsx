@@ -1,204 +1,225 @@
-import React, { useState } from 'react';
-import {
-  FinancialProvider,
-  useFinancial,
-  ScreenType
-} from './context/FinancialContext';
-import { Sidebar } from './components/common/Sidebar';
-import { Navbar } from './components/common/Navbar';
-import { DetailModal } from './components/common/DetailModal';
-import { OnboardingModal } from './components/common/OnboardingModal';
+import React, { useState, useEffect } from 'react';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { FinancialProvider, useFinancial } from './context/FinancialContext';
 
-// Screens
-import { HomeScreen } from './components/screens/HomeScreen';
-import { MoneyScreen } from './components/screens/MoneyScreen';
-import { BusinessScreen } from './components/screens/BusinessScreen';
-import { GoalsScreen } from './components/screens/GoalsScreen';
-import { InsightsScreen } from './components/screens/InsightsScreen';
-import { AccountsScreen } from './components/screens/AccountsScreen';
+// Auth & Onboarding Views
+import { WelcomeScreen } from './components/auth/WelcomeScreen';
+import { SignUpScreen } from './components/auth/SignUpScreen';
+import { LoginScreen } from './components/auth/LoginScreen';
+import { ForgotPasswordScreen } from './components/auth/ForgotPasswordScreen';
+import { VerifyScreen } from './components/auth/VerifyScreen';
+import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
+
+// Workspace Shell & Dashboards
+import { WorkspaceShell } from './components/common/WorkspaceShell';
+import { PersonalOverview } from './components/screens/PersonalOverview';
+import { BusinessOverview } from './components/screens/BusinessOverview';
+
+// Other Screens
 import { TransactionsScreen } from './components/screens/TransactionsScreen';
+import { AccountsScreen } from './components/screens/AccountsScreen';
 import { BudgetsScreen } from './components/screens/BudgetsScreen';
-import { RecurringScreen } from './components/screens/RecurringScreen';
-import { CalendarScreen } from './components/screens/CalendarScreen';
+import { GoalsScreen } from './components/screens/GoalsScreen';
 import { SalesScreen } from './components/screens/SalesScreen';
 import { InventoryScreen } from './components/screens/InventoryScreen';
 import { CustomersScreen } from './components/screens/CustomersScreen';
 import { SuppliersScreen } from './components/screens/SuppliersScreen';
 import { InvestmentsScreen } from './components/screens/InvestmentsScreen';
 import { ReportsScreen } from './components/screens/ReportsScreen';
+import { InsightsScreen } from './components/screens/InsightsScreen';
 import { NotificationsScreen } from './components/screens/NotificationsScreen';
 import { FinancialProvidersScreen } from './components/screens/FinancialProvidersScreen';
 import { SettingsScreen } from './components/screens/SettingsScreen';
+import { BusinessScreen } from './components/screens/BusinessScreen';
+import { DetailModal } from './components/common/DetailModal';
 
-import {
-  Home,
-  CreditCard,
-  Briefcase,
-  Target,
-  LineChart,
-  Menu,
-  X
-} from 'lucide-react';
+const AppNavigator: React.FC = () => {
+  const { user, activeWorkspace, isLoadingAuth, isAuthenticated, isVerified, refreshMe, createWorkspace } = useAuth();
+  const [authView, setAuthView] = useState<'welcome' | 'signup' | 'login' | 'forgot_password'>('welcome');
+  const [currentScreen, setCurrentScreen] = useState<string>('overview');
 
-const MainAppContent: React.FC = () => {
-  const { currentScreen, setCurrentScreen } = useFinancial();
-  const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  // Handle URL hash changes for deep links & back/forward navigation
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#/', '').replace('#', '');
+      if (hash) {
+        const parts = hash.split('/');
+        if (parts[0] === 'welcome') setAuthView('welcome');
+        else if (parts[0] === 'signup') setAuthView('signup');
+        else if (parts[0] === 'login') setAuthView('login');
+        else if (parts[0] === 'forgot-password') setAuthView('forgot_password');
+        else if (parts[0] === 'app' && parts[2]) {
+          setCurrentScreen(parts[2]);
+        }
+      }
+    };
 
-  // Render current screen
-  const renderScreen = () => {
-    switch (currentScreen) {
-      case 'home':
-        return <HomeScreen />;
-      case 'money':
-        return <MoneyScreen />;
-      case 'business':
-      case 'review':
-      case 'receivables':
-      case 'payables':
-      case 'expenses':
-        return <BusinessScreen />;
-      case 'goals':
-        return <GoalsScreen />;
-      case 'insights':
-        return <InsightsScreen />;
-      case 'accounts':
-        return <AccountsScreen />;
-      case 'transactions':
-        return <TransactionsScreen />;
-      case 'budgets':
-        return <BudgetsScreen />;
-      case 'recurring':
-        return <RecurringScreen />;
-      case 'calendar':
-        return <CalendarScreen />;
-      case 'sales':
-        return <SalesScreen />;
-      case 'inventory':
-        return <InventoryScreen />;
-      case 'customers':
-        return <CustomersScreen />;
-      case 'suppliers':
-        return <SuppliersScreen />;
-      case 'investments':
-        return <InvestmentsScreen />;
-      case 'reports':
-        return <ReportsScreen />;
-      case 'notifications':
-        return <NotificationsScreen />;
-      case 'providers':
-        return <FinancialProvidersScreen />;
-      case 'settings':
-        return <SettingsScreen />;
-      default:
-        return <HomeScreen />;
+    window.addEventListener('hashchange', handleHashChange);
+    handleHashChange();
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  // Update hash when screen changes
+  useEffect(() => {
+    if (activeWorkspace?.onboardingStatus === 'completed') {
+      window.location.hash = `/app/${activeWorkspace.type}/${currentScreen}`;
+    }
+  }, [currentScreen, activeWorkspace?.type, activeWorkspace?.onboardingStatus]);
+
+  // Loading Screen
+  if (isLoadingAuth) {
+    return (
+      <div className="min-h-screen bg-[#edf4f0] flex flex-col items-center justify-center p-4">
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#047857] to-[#10b981] flex items-center justify-center text-white shadow-md animate-pulse mb-3">
+          <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2" />
+            <line x1="12" y1="22" x2="12" y2="15.5" />
+            <polyline points="22 8.5 12 15.5 2 8.5" />
+          </svg>
+        </div>
+        <p className="text-xs font-bold text-emerald-950 uppercase tracking-wider">Loading CashDeck...</p>
+      </div>
+    );
+  }
+
+  // 1. Not Authenticated
+  if (!isAuthenticated) {
+    if (authView === 'signup') {
+      return (
+        <SignUpScreen
+          onSuccess={() => refreshMe()}
+          onNavigateToLogin={() => setAuthView('login')}
+        />
+      );
+    }
+    if (authView === 'login') {
+      return (
+        <LoginScreen
+          onSuccess={() => refreshMe()}
+          onNavigateToSignUp={() => setAuthView('signup')}
+          onForgotPassword={() => setAuthView('forgot_password')}
+        />
+      );
+    }
+    if (authView === 'forgot_password') {
+      return (
+        <ForgotPasswordScreen
+          onBackToLogin={() => setAuthView('login')}
+        />
+      );
+    }
+    return (
+      <WelcomeScreen
+        onGetStarted={() => setAuthView('signup')}
+        onSignIn={() => setAuthView('login')}
+      />
+    );
+  }
+
+  // 2. Authenticated, not email verified
+  if (!isVerified) {
+    return <VerifyScreen onSuccess={() => refreshMe()} />;
+  }
+
+  // 3. Authenticated & verified, but workspace onboarding incomplete
+  if (!activeWorkspace || activeWorkspace.onboardingStatus !== 'completed') {
+    return (
+      <OnboardingFlow
+        onFinished={() => {
+          refreshMe();
+          setCurrentScreen('overview');
+        }}
+      />
+    );
+  }
+
+  // 4. Onboarding complete: Main App with Workspace Isolation
+  const isBusiness = activeWorkspace.type === 'business';
+
+  const renderActiveScreen = () => {
+    if (isBusiness) {
+      // BUSINESS WORKSPACE SCREENS
+      switch (currentScreen) {
+        case 'overview':
+          return <BusinessOverview onNavigate={setCurrentScreen} />;
+        case 'sales':
+          return <SalesScreen />;
+        case 'expenses':
+          return <BusinessScreen />;
+        case 'inventory':
+          return <InventoryScreen />;
+        case 'customers':
+          return <CustomersScreen />;
+        case 'suppliers':
+          return <SuppliersScreen />;
+        case 'reports':
+          return <ReportsScreen />;
+        case 'insights':
+          return <InsightsScreen />;
+        case 'notifications':
+          return <NotificationsScreen />;
+        case 'providers':
+          return <FinancialProvidersScreen />;
+        case 'settings':
+          return <SettingsScreen />;
+        default:
+          return <BusinessOverview onNavigate={setCurrentScreen} />;
+      }
+    } else {
+      // PERSONAL WORKSPACE SCREENS
+      switch (currentScreen) {
+        case 'overview':
+          return <PersonalOverview onNavigate={setCurrentScreen} />;
+        case 'transactions':
+          return <TransactionsScreen />;
+        case 'budgets':
+          return <BudgetsScreen />;
+        case 'goals':
+          return <GoalsScreen />;
+        case 'savings':
+        case 'accounts':
+          return <AccountsScreen />;
+        case 'investments':
+          return <InvestmentsScreen />;
+        case 'reports':
+          return <ReportsScreen />;
+        case 'insights':
+          return <InsightsScreen />;
+        case 'notifications':
+          return <NotificationsScreen />;
+        case 'providers':
+          return <FinancialProvidersScreen />;
+        case 'settings':
+          return <SettingsScreen />;
+        default:
+          return <PersonalOverview onNavigate={setCurrentScreen} />;
+      }
     }
   };
 
   return (
-    <div className="flex min-h-screen bg-[#edf4f0] text-slate-800">
-      {/* Desktop Left Sidebar */}
-      <div className="hidden lg:block">
-        <Sidebar onOpenOnboarding={() => setIsOnboardingModalOpen(true)} />
-      </div>
-
-      {/* Mobile Drawer Backdrop & Sidebar */}
-      {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-50 flex lg:hidden">
-          <div
-            className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs"
-            onClick={() => setIsMobileMenuOpen(false)}
-          />
-          <div className="relative z-10 w-72 bg-[#f8faf9] h-full shadow-2xl flex flex-col justify-between">
-            <div className="absolute top-4 right-4">
-              <button
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-600"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <Sidebar
-              onOpenOnboarding={() => {
-                setIsMobileMenuOpen(false);
-                setIsOnboardingModalOpen(true);
-              }}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Top Navbar */}
-        <div className="relative">
-          <Navbar onOpenOnboarding={() => setIsOnboardingModalOpen(true)} />
-
-          {/* Mobile hamburger trigger bar */}
-          <div className="lg:hidden px-4 py-2 bg-white/70 border-b border-slate-200/60 flex items-center justify-between">
-            <button
-              onClick={() => setIsMobileMenuOpen(true)}
-              className="flex items-center gap-2 text-xs font-bold text-slate-700 p-1"
-            >
-              <Menu className="w-5 h-5 text-emerald-800" />
-              <span>Navigation Menu</span>
-            </button>
-            <span className="text-xs font-semibold text-emerald-800 capitalize">
-              {currentScreen}
-            </span>
-          </div>
-        </div>
-
-        {/* Dynamic Screen View with Responsive Fluid Container */}
-        <main className="flex-1 w-full max-w-7xl xl:max-w-[1440px] 2xl:max-w-[1560px] mx-auto p-3.5 sm:p-5 md:p-6 lg:p-8 pb-24 lg:pb-8 transition-all">
-          {renderScreen()}
-        </main>
-
-        {/* Mobile Bottom Navigation Bar for rapid one-thumb access */}
-        <div className="lg:hidden fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-slate-200/80 px-2 py-2 flex items-center justify-around z-40 shadow-lg">
-          {[
-            { id: 'home' as ScreenType, label: 'Home', icon: Home },
-            { id: 'money' as ScreenType, label: 'Money', icon: CreditCard },
-            { id: 'business' as ScreenType, label: 'Business', icon: Briefcase },
-            { id: 'goals' as ScreenType, label: 'Goals', icon: Target },
-            { id: 'insights' as ScreenType, label: 'Insights', icon: LineChart }
-          ].map(item => {
-            const Icon = item.icon;
-            const isActive = currentScreen === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setCurrentScreen(item.id)}
-                className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
-                  isActive
-                    ? 'text-[#065f46] font-bold'
-                    : 'text-slate-400 hover:text-slate-600'
-                }`}
-              >
-                <Icon className={`w-5 h-5 ${isActive ? 'stroke-[2.5px]' : ''}`} />
-                <span className="text-[10px] mt-0.5">{item.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Global Interactive Entity Detail Modal */}
+    <WorkspaceShell
+      currentScreen={currentScreen}
+      onNavigate={setCurrentScreen}
+      onAddNewWorkspace={async type => {
+        await createWorkspace(type);
+        setCurrentScreen('overview');
+      }}
+    >
+      {renderActiveScreen()}
       <DetailModal />
-
-      {/* Interactive 13-step Onboarding Modal */}
-      <OnboardingModal
-        isOpen={isOnboardingModalOpen}
-        onClose={() => setIsOnboardingModalOpen(false)}
-      />
-    </div>
+    </WorkspaceShell>
   );
 };
 
-export default function App() {
+export function App() {
   return (
-    <FinancialProvider>
-      <MainAppContent />
-    </FinancialProvider>
+    <AuthProvider>
+      <FinancialProvider>
+        <AppNavigator />
+      </FinancialProvider>
+    </AuthProvider>
   );
 }
+
+export default App;
